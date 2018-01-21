@@ -1,29 +1,5 @@
 <?php
 
-class Bar
-{
-  function __construct() {
-    $this->x = null;
-  }
-}
-
-class Foo
-{
-  public $item;
-  public $name;
-  private $value;
-  function __construct() {
-    $this->item = 123;
-    $this->name = 'Name!';
-    $this->value = true;
-    $this->bar = new Bar();
-  }
-
-  function getQwerty() {
-    return 'qwerty';
-  }
-}
-
 class PrettyPrint
 {
   static function format($callback, &$output = '', $maxwidth = 79, $newline = "\n", $genspace = null) {
@@ -454,9 +430,3 @@ function ppd(...$objs) {
   pp(...$objs);
   die();
 }
-
-$s = new stdClass;
-$s->foo = 'foo';
-pp(new ReflectionObject(new Foo()));
-pp($s);
-pp(new Foo());
