@@ -3,6 +3,7 @@
 class Bar
 {
   function __construct() {
+    $this->x = null;
   }
 }
 
@@ -307,6 +308,9 @@ class PP extends PrettyPrint
   // }
   
   private function pp($obj) {
+    // TODO: Other built-in data types? stdClass
+    // TODO: XML, JSON, common representations?
+    // TODO: Methods?
     $this->group(function() use($obj) {
       if (is_array($obj)) {
         $isHash = array_keys($obj) !== range(0, count($obj) - 1);
@@ -321,13 +325,65 @@ class PP extends PrettyPrint
         $this->text($obj ? 'true' : 'false');
       } else if (is_string($obj)) {
         $this->ppString($obj);
+      } else if ($obj === null) {
+        $this->text('null');
+      } else if (is_object($obj)) {
+        $this->ppObject($obj);
+      } else {
+        $this->text("$obj");
       }
     });
   }
 
   private function ppString($str) {
-    // TODO: Escape: https://secure.php.net/manual/en/language.types.string.php
+    $escaped = [
+      "\n" => '\n',
+      "\r" => '\r',
+      "\t" => '\t',
+      "\v" => '\v',
+      "\e" => '\e',
+      "\f" => '\f',
+      "\\" => '\\\\',
+      "\$" => '\$',
+      '"' => '\"'
+    ];
+    $str = preg_replace_callback("/[\n\r\t\v\e\f\$\"\\\\]/", function($match) use($escaped) {
+      return $escaped[$match[0]];
+    }, $str);
     $this->text("\"$str\"");
+  }
+
+  private function ppObject($obj) {
+    // TODO: Print address?
+    $this->group(function() use($obj) {
+      $this->seplist(function($k, $v) {
+        $this->breakable();
+        $this->text($k);
+        $this->text('=');
+        $this->group(function() use($v) {
+          $this->breakable('');
+          $this->pp($v);
+        }, 1);
+      }, $obj, function() { $this->text(','); }, function($obj, $callback) {
+        $reflection = new ReflectionObject($obj);
+        foreach ($reflection->getProperties() as $prop) {
+          $prop->setAccessible(true);
+          $callback($prop->getName(), $prop->getValue($obj));
+        }
+
+        /*
+         * TODO: Support calling get*() methods?
+        foreach ($reflection->getMethods() as $method) {
+          $name = $method->getName();
+          if (preg_match('/^get[^a-z](.*)/', $name) && $method->getNumberOfParameters() == 0) {
+            $method->setAccessible(true);
+            $value = $method->invoke($obj);
+            $callback("$name()", $value);
+          }
+        }
+         */
+      });
+    }, 1, '#<' . get_class($obj), '>');
   }
 
   private function ppArray($arr) {
@@ -394,96 +450,13 @@ function pp(...$objs) {
   }
 }
 
-//pp([1, 2, 3]);
-pp($_ENV);
-
-/*
-function ppobj($obj) {
-  // TODO: Private object vars?
-  // TODO: Object address?
- 
-  $class = get_class($obj);
-  $vars = get_object_vars($obj);
-
-  $s = "#<$class";
-
-  $parts = [];
-  foreach ($vars as $var => $_) {
-    $value = $obj->$var;
-    $parts []= "$$var=" . ppfmt($value);
-  }
-
-  if (count($parts) > 0) {
-    $s .= ' ' . implode(', ', $parts);
-  }
-
-  //$parts = [];
-  //$methods = get_class_methods($class);
-  //foreach ($methods as $method) {
-  //  if (preg_match('/^get[^a-z](.*)/', $method)) {
-  //    $value = $obj->$method();
-  //    $parts []= "$method()=" . ppfmt($value);
-  //  }
-  //}
-
-  //if (count($parts) > 0) {
-  //  $s .= ' ' . implode(', ', $parts);
-  //}
-
-  $s .= '>';
-  return $s;
+function ppd(...$objs) {
+  pp(...$objs);
+  die();
 }
 
-function pparr($arr) {
-  $s = '[';
-
-  $isMap = array_keys($arr) !== range(0, count($arr) - 1);
-
-  if ($isMap) {
-    $parts = [];
-    foreach ($arr as $key => $value) {
-      $parts []= ppfmt($key) . ' => ' . ppfmt($value);
-    }
-    $s .= implode(', ', $parts);
-  } else {
-    $values = array_map(function($e) { return ppfmt($e); }, array_values($arr));
-    $s .= implode(', ', $values);
-  }
-
-  $s .= ']';
-  return $s;
-}
-
-function ppfmt($data) {
-  // TODO: Other built-in data types? stdClass
-  // TODO: XML, JSON, common representations?
-  // TODO: Methods?
-  if (is_array($data)) {
-    return pparr($data);
-  } else if (is_numeric($data)) {
-    return "$data";
-  } else if (is_bool($data)) {
-    return $data ? 'true' : 'false';
-  } else if ($data === null) {
-    return 'null';
-  } else if (is_string($data)) {
-    // TODO: Escape string chars.
-    return "\"$data\"";
-  } else if (is_object($data)) {
-    return ppobj($data);
-  } else {
-    return "$data";
-  }
-  // is_resource
-}
-
-function ppd($data) {
-  die(ppfmt($data));
-  return $data;
-}
-
-function pp($data) {
-  echo(ppfmt($data));
-  return $data;
-}
- */
+$s = new stdClass;
+$s->foo = 'foo';
+pp(new ReflectionObject(new Foo()));
+pp($s);
+pp(new Foo());
